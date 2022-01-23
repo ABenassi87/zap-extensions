@@ -28,16 +28,16 @@ import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.network.HttpRequestHeader;
 import org.parosproxy.paros.network.HttpResponseHeader;
 import org.parosproxy.paros.network.HttpSender;
-import org.zaproxy.addon.soosspa.processors.selenium.SeleniumProcessor;
+import org.zaproxy.addon.soosspa.processors.ISOOSZAPProcessor;
+import org.zaproxy.addon.soosspa.processors.splash.SplashProcessor;
 import org.zaproxy.addon.soosspa.utils.SOOSSPAUtils;
-import org.zaproxy.zap.extension.selenium.Browser;
 import org.zaproxy.zap.extension.selenium.SeleniumOptions;
 import org.zaproxy.zap.network.HttpResponseBody;
 import org.zaproxy.zap.network.HttpSenderListener;
 
 public class SOOSSPAHttpSenderListener implements HttpSenderListener {
     private static final Logger LOGGER = LogManager.getLogger(SOOSSPAHttpSenderListener.class);
-    private final SeleniumProcessor processor;
+    private final ISOOSZAPProcessor processor;
     private final HashSet<Integer> validInitiators;
     private static final Map<String, String> pages = new HashMap<>();
 
@@ -45,7 +45,7 @@ public class SOOSSPAHttpSenderListener implements HttpSenderListener {
         System.setProperty(
                 SeleniumOptions.FIREFOX_DRIVER_SYSTEM_PROPERTY,
                 "C:/Instaladores/Geckodriver/geckodriver.exe");
-        this.processor = new SeleniumProcessor(Browser.FIREFOX_HEADLESS);
+        this.processor = new SplashProcessor("http://localhost:8050");
         this.validInitiators = new HashSet<>();
         this.validInitiators.add(HttpSender.ACTIVE_SCANNER_INITIATOR);
         this.validInitiators.add(HttpSender.AJAX_SPIDER_INITIATOR);
@@ -90,6 +90,7 @@ public class SOOSSPAHttpSenderListener implements HttpSenderListener {
                     }
 
                     if (newContent != null) {
+                        LOGGER.info("New Content" + newContent);
                         msg.setResponseBody(newContent);
                     }
                 }

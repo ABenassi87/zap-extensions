@@ -38,14 +38,13 @@ import org.parosproxy.paros.core.proxy.OverrideMessageProxyListener;
 import org.parosproxy.paros.core.proxy.ProxyServer;
 import org.parosproxy.paros.model.Model;
 import org.parosproxy.paros.network.HttpMessage;
-import org.zaproxy.addon.soosspa.ExtensionSOOSSPA;
 import org.zaproxy.addon.soosspa.processors.ISOOSZAPProcessor;
 import org.zaproxy.addon.soosspa.utils.WebDriverWrapper;
 import org.zaproxy.zap.extension.selenium.Browser;
 import org.zaproxy.zap.extension.selenium.ExtensionSelenium;
 
 public class SeleniumProcessor implements ISOOSZAPProcessor {
-    private static final Logger LOGGER = LogManager.getLogger(ExtensionSOOSSPA.class);
+    private static final Logger LOGGER = LogManager.getLogger(SeleniumProcessor.class);
 
     private static final Map<Browser, Stack<WebDriverWrapper>> freeDrivers = new HashMap<>();
     private static final List<WebDriverWrapper> takenDrivers = new ArrayList<>();
@@ -204,6 +203,7 @@ public class SeleniumProcessor implements ISOOSZAPProcessor {
         }
     }
 
+    @Override
     public String getHtmlSourceCode(String url) {
         WebDriverWrapper driverWrapper = getWebDriver();
         driverWrapper.getDriver().get(url);

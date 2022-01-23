@@ -26,6 +26,8 @@ zapAddOn {
 dependencies {
     compileOnly(parent!!.childProjects.get("commonlib")!!)
     compileOnly(parent!!.childProjects.get("selenium")!!)
+    implementation("org.apache.httpcomponents:httpclient:4.5.13")
+
     testImplementation(parent!!.childProjects.get("commonlib")!!)
     testImplementation(parent!!.childProjects.get("selenium")!!)
     testImplementation("io.github.bonigarcia:webdrivermanager:5.0.3")
