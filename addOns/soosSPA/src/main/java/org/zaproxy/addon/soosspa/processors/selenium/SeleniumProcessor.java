@@ -1,29 +1,50 @@
-package org.zaproxy.addon.soosspa.utils;
+/*
+ * Zed Attack Proxy (ZAP) and its related class files.
+ *
+ * ZAP is an HTTP/HTTPS proxy for assessing web application security.
+ *
+ * Copyright 2022 The ZAP Development Team
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.zaproxy.addon.soosspa.processors.selenium;
 
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Stack;
+import java.util.concurrent.TimeUnit;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openqa.selenium.UnexpectedAlertBehaviour;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.firefox.FirefoxDriver;
+import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.remote.CapabilityType;
 import org.parosproxy.paros.core.proxy.OverrideMessageProxyListener;
 import org.parosproxy.paros.core.proxy.ProxyServer;
 import org.parosproxy.paros.model.Model;
 import org.parosproxy.paros.network.HttpMessage;
 import org.zaproxy.addon.soosspa.ExtensionSOOSSPA;
+import org.zaproxy.addon.soosspa.processors.ISOOSZAPProcessor;
+import org.zaproxy.addon.soosspa.utils.WebDriverWrapper;
 import org.zaproxy.zap.extension.selenium.Browser;
 import org.zaproxy.zap.extension.selenium.ExtensionSelenium;
 
-
-import java.util.Stack;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.concurrent.TimeUnit;
-
-public class SOOSSPAProcessor {
+public class SeleniumProcessor implements ISOOSZAPProcessor {
     private static final Logger LOGGER = LogManager.getLogger(ExtensionSOOSSPA.class);
 
     private static final Map<Browser, Stack<WebDriverWrapper>> freeDrivers = new HashMap<>();
@@ -34,16 +55,16 @@ public class SOOSSPAProcessor {
 
     private static ProxyServer proxy = null;
     private static int proxyPort = -1;
+    private static final String proxyAddress = "127.0.0.1";
 
     private final Browser browser;
 
-    public SOOSSPAProcessor(Browser browser) {
+    public SeleniumProcessor(Browser browser) {
         this.browser = browser;
         getProxy();
-        WebDriverWrapper driver = new WebDriverWrapper(createWebDriver(), this.browser);
+        WebDriverWrapper driver = new WebDriverWrapper(createWebDriverCustom(), this.browser);
         freeDrivers.computeIfAbsent(driver.getBrowser(), k -> new Stack<>()).push(driver);
     }
-
     /*
      * We use a separate port so that we dont polute the sites tree
      * and show the requests in the Active Scan tab
@@ -71,7 +92,7 @@ public class SOOSSPAProcessor {
                             return true;
                         }
                     });
-            proxyPort = proxy.startServer("127.0.0.1", 0, true);
+            proxyPort = proxy.startServer(proxyAddress, 0, true);
         }
     }
 
@@ -92,6 +113,13 @@ public class SOOSSPAProcessor {
         return webDriver;
     }
 
+    private WebDriver createWebDriverCustom() {
+        FirefoxOptions firefoxOptions = new FirefoxOptions();
+        firefoxOptions.setHeadless(true);
+
+        return new FirefoxDriver(firefoxOptions);
+    }
+
     private WebDriverWrapper getWebDriver() {
         WebDriverWrapper driver = null;
         try {
@@ -104,7 +132,7 @@ public class SOOSSPAProcessor {
             // Ignore
         }
         if (driver == null) {
-            driver = new WebDriverWrapper(createWebDriver(), browser);
+            driver = new WebDriverWrapper(createWebDriverCustom(), browser);
         }
         synchronized (takenDrivers) {
             takenDrivers.add(driver);
@@ -132,15 +160,15 @@ public class SOOSSPAProcessor {
                                                 while (iter.hasNext()) {
                                                     WebDriverWrapper wrapper = iter.next();
                                                     if ((now.getTime()
-                                                            - wrapper.getLastAccessed()
-                                                            .getTime())
-                                                            / 1000
+                                                                            - wrapper.getLastAccessed()
+                                                                                    .getTime())
+                                                                    / 1000
                                                             > 10) {
                                                         LOGGER.debug(
                                                                 "Driver hung {}",
                                                                 wrapper.getDriver().hashCode());
                                                         wrapper.getDriver().quit();
-                                                        wrapper.setDriver(createWebDriver());
+                                                        wrapper.setDriver(createWebDriverCustom());
                                                         LOGGER.debug(
                                                                 "New driver {}",
                                                                 wrapper.getDriver().hashCode());
@@ -148,7 +176,8 @@ public class SOOSSPAProcessor {
                                                 }
                                             }
                                         } while (takenDrivers.size() > 0);
-                                        LOGGER.info("Reaper thread exiting {}", takenDrivers.size());
+                                        LOGGER.info(
+                                                "Reaper thread exiting {}", takenDrivers.size());
                                         reaperThread = null;
                                     });
                     reaperThread.start();

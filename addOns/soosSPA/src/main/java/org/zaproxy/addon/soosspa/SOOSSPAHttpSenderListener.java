@@ -19,31 +19,37 @@
  */
 package org.zaproxy.addon.soosspa;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.network.HttpRequestHeader;
 import org.parosproxy.paros.network.HttpResponseHeader;
 import org.parosproxy.paros.network.HttpSender;
-import org.zaproxy.addon.soosspa.utils.SOOSSPAProcessor;
+import org.zaproxy.addon.soosspa.processors.selenium.SeleniumProcessor;
+import org.zaproxy.addon.soosspa.utils.SOOSSPAUtils;
 import org.zaproxy.zap.extension.selenium.Browser;
+import org.zaproxy.zap.extension.selenium.SeleniumOptions;
 import org.zaproxy.zap.network.HttpResponseBody;
 import org.zaproxy.zap.network.HttpSenderListener;
 
-import java.util.HashSet;
-import java.util.Set;
-
 public class SOOSSPAHttpSenderListener implements HttpSenderListener {
     private static final Logger LOGGER = LogManager.getLogger(SOOSSPAHttpSenderListener.class);
-    private final SOOSSPAProcessor processor;
+    private final SeleniumProcessor processor;
     private final HashSet<Integer> validInitiators;
+    private static final Map<String, String> pages = new HashMap<>();
 
     public SOOSSPAHttpSenderListener() {
-        this.processor = new SOOSSPAProcessor(Browser.FIREFOX_HEADLESS);
+        System.setProperty(
+                SeleniumOptions.FIREFOX_DRIVER_SYSTEM_PROPERTY,
+                "C:/Instaladores/Geckodriver/geckodriver.exe");
+        this.processor = new SeleniumProcessor(Browser.FIREFOX_HEADLESS);
         this.validInitiators = new HashSet<>();
-        this.validInitiators.add(2);
-        this.validInitiators.add(3);
-        this.validInitiators.add(10);
+        this.validInitiators.add(HttpSender.ACTIVE_SCANNER_INITIATOR);
+        this.validInitiators.add(HttpSender.AJAX_SPIDER_INITIATOR);
+        this.validInitiators.add(HttpSender.SPIDER_INITIATOR);
     }
 
     @Override
@@ -58,17 +64,38 @@ public class SOOSSPAHttpSenderListener implements HttpSenderListener {
 
     @Override
     public void onHttpResponseReceive(HttpMessage msg, int initiator, HttpSender sender) {
-        HttpRequestHeader requestHeader = msg.getRequestHeader();
-        String httpMethod = requestHeader.getMethod();
-        HttpResponseHeader responseHeader = msg.getResponseHeader();
-        int statusCode = responseHeader.getStatusCode();
-        if (httpMethod.equals("GET")
-                && this.validInitiators.contains(initiator)
-                && responseHeader.getContentLength() > 0
-                && statusCode >= 200 && statusCode < 300) {
-            HttpResponseBody responseBody = msg.getResponseBody();
-            String content = responseBody.toString();
-        }
+        try {
+            HttpRequestHeader requestHeader = msg.getRequestHeader();
+            String httpMethod = requestHeader.getMethod();
+            HttpResponseHeader responseHeader = msg.getResponseHeader();
+            int statusCode = responseHeader.getStatusCode();
+            if (httpMethod.equals("GET")
+                    && this.validInitiators.contains(initiator)
+                    && responseHeader.getContentLength() > 0
+                    && statusCode >= 200
+                    && statusCode < 300) {
+                HttpResponseBody responseBody = msg.getResponseBody();
+                String content = responseBody.toString();
+                if (content != null
+                        && !content.isEmpty()
+                        && content.toLowerCase().contains("<html")
+                        && SOOSSPAUtils.isModernWebApp(content)) {
+                    String targetURL = requestHeader.getURI().getURI();
+                    String newContent;
+                    if (pages.containsKey(targetURL)) {
+                        newContent = pages.get(targetURL);
+                    } else {
+                        newContent = this.processor.getHtmlSourceCode(targetURL);
+                        pages.put(targetURL, newContent);
+                    }
 
+                    if (newContent != null) {
+                        msg.setResponseBody(newContent);
+                    }
+                }
+            }
+        } catch (Exception exception) {
+            LOGGER.error(exception);
+        }
     }
 }
